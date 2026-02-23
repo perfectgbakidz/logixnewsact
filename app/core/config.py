@@ -72,6 +72,11 @@ class Settings(BaseSettings):
                 value = value.split(":", 1)[0]
             if value:
                 hosts.append(value)
+        # Always include backend-safe defaults even when env input is incomplete.
+        baseline_hosts = ["localhost", "127.0.0.1", "*.onrender.com"]
+        for host in baseline_hosts:
+            if host not in hosts:
+                hosts.append(host)
         return hosts
 
     @property
