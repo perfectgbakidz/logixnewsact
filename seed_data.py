@@ -1,221 +1,261 @@
 """
-Seed data script for Logic NewsAct backend.
-Run this script to populate the database with initial data.
+Seed script for Logic NewsAct backend.
 
-Supports both local PostgreSQL and Supabase.
+This script is idempotent:
+- Creates tables if they do not exist.
+- Creates/updates one default admin.
+- Creates regions and sub-zones from a fixed catalog.
+- Creates sample posts if missing (matched by title).
 """
+
 import asyncio
-import os
 import sys
-from datetime import datetime, timezone
+from typing import Dict, List
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import AsyncSessionLocal, init_db
-from app.models.models import Admin, Region, SubZone, Post
-from app.core.security import get_password_hash
 from app.core.config import settings
+from app.core.security import get_password_hash
+from app.db.database import AsyncSessionLocal, init_db
+from app.models.models import Admin, Post, Region, SubZone
 
 
-async def check_admin_exists(db: AsyncSession) -> bool:
-    """Check if admin user already exists."""
-    result = await db.execute(select(Admin).where(Admin.username == "admin"))
-    return result.scalar_one_or_none() is not None
+DEFAULT_ADMIN = {
+    "username": "admin",
+    "password": "admin123",
+    "full_name": "System Administrator",
+    "email": "admin@logicnewsact.ng",
+    "avatar_url": None,
+    "role": "Editor-in-Chief",
+}
+
+REGION_ZONE_MAP: Dict[str, List[str]] = {
+    "IbileLogic": ["Lagos", "Ogun", "Oyo", "Osun", "Ekiti", "Ondo"],
+    "ArewaLogic": ["Kano", "Kaduna", "Katsina", "Sokoto", "Zamfara"],
+    "NaijaLogic": ["Abuja", "Nasarawa", "Niger", "Plateau"],
+    "NigerDeltaLogic": ["Rivers", "Delta", "Bayelsa", "Akwa Ibom"],
+}
+
+SAMPLE_POSTS = [
+    {
+        "title": "Breaking: Major Infrastructure Project Announced",
+        "excerpt": "Government unveils an ambitious infrastructure plan for the region.",
+        "content": (
+            "<p>Officials announced a multi-year infrastructure rollout focused on roads, "
+            "power, and digital access across priority states.</p>"
+        ),
+        "author": "Logic NewsAct Desk",
+        "date": "January 15, 2024",
+        "category": "IbileLogic",
+        "image_url": None,
+        "read_time": "5 min read",
+        "views": 0,
+        "is_breaking": True,
+        "is_editors_choice": False,
+        "is_top_news": True,
+        "is_trending": False,
+    },
+    {
+        "title": "Tech Innovation Hub Opens in Lagos",
+        "excerpt": "A new tech hub opens to support startups and digital talent.",
+        "content": (
+            "<p>The center provides shared workspace, mentorship, and seed support for "
+            "early-stage founders.</p>"
+        ),
+        "author": "Business Correspondent",
+        "date": "January 14, 2024",
+        "category": "IbileLogic",
+        "image_url": None,
+        "read_time": "4 min read",
+        "views": 0,
+        "is_breaking": False,
+        "is_editors_choice": False,
+        "is_top_news": False,
+        "is_trending": True,
+    },
+    {
+        "title": "Agricultural Reform Shows Early Promise",
+        "excerpt": "New farming support programs report improved yields in pilot zones.",
+        "content": (
+            "<p>Initial outcomes show better productivity, with expanded irrigation and "
+            "training for smallholder farmers.</p>"
+        ),
+        "author": "Northern Bureau",
+        "date": "January 13, 2024",
+        "category": "ArewaLogic",
+        "image_url": None,
+        "read_time": "6 min read",
+        "views": 0,
+        "is_breaking": False,
+        "is_editors_choice": True,
+        "is_top_news": False,
+        "is_trending": False,
+    },
+    {
+        "title": "Education Sector Receives Major Funding",
+        "excerpt": "Budget increase targets school facilities and teacher training.",
+        "content": (
+            "<p>Education stakeholders welcomed the allocation, citing urgent needs in "
+            "classroom expansion and instructional materials.</p>"
+        ),
+        "author": "Policy Reporter",
+        "date": "January 12, 2024",
+        "category": "NaijaLogic",
+        "image_url": None,
+        "read_time": "5 min read",
+        "views": 0,
+        "is_breaking": False,
+        "is_editors_choice": False,
+        "is_top_news": False,
+        "is_trending": True,
+    },
+    {
+        "title": "Community Projects Expand in the Niger Delta",
+        "excerpt": "New local investment commitments focus on health and waterways.",
+        "content": (
+            "<p>Community leaders outlined joint priorities around clinics, schools, and "
+            "transport access in riverine areas.</p>"
+        ),
+        "author": "Delta Correspondent",
+        "date": "January 11, 2024",
+        "category": "NigerDeltaLogic",
+        "image_url": None,
+        "read_time": "7 min read",
+        "views": 0,
+        "is_breaking": False,
+        "is_editors_choice": False,
+        "is_top_news": True,
+        "is_trending": False,
+    },
+]
 
 
-async def create_initial_admin(db: AsyncSession):
-    """Create initial admin user."""
-    # Check if admin already exists
-    if await check_admin_exists(db):
-        print("⚠️  Admin user 'admin' already exists, skipping...")
-        result = await db.execute(select(Admin).where(Admin.username == "admin"))
-        return result.scalar_one()
-
-    admin = Admin(
-        username="admin",
-        hashed_password=get_password_hash("admin123"),  # Change in production!
-        full_name="System Administrator",
-        email="admin@logicnewsact.ng",
-        role="Editor-in-Chief"
+async def upsert_default_admin(db: AsyncSession) -> Admin:
+    """Create admin if missing, otherwise keep existing and update profile fields."""
+    result = await db.execute(
+        select(Admin).where(Admin.username == DEFAULT_ADMIN["username"])
     )
-    db.add(admin)
+    admin = result.scalar_one_or_none()
+
+    if admin is None:
+        admin = Admin(
+            username=DEFAULT_ADMIN["username"],
+            hashed_password=get_password_hash(DEFAULT_ADMIN["password"]),
+            full_name=DEFAULT_ADMIN["full_name"],
+            email=DEFAULT_ADMIN["email"],
+            avatar_url=DEFAULT_ADMIN["avatar_url"],
+            role=DEFAULT_ADMIN["role"],
+        )
+        db.add(admin)
+        await db.commit()
+        await db.refresh(admin)
+        print("Created default admin: username=admin password=admin123")
+        return admin
+
+    admin.full_name = DEFAULT_ADMIN["full_name"]
+    admin.email = DEFAULT_ADMIN["email"]
+    admin.avatar_url = DEFAULT_ADMIN["avatar_url"]
+    admin.role = DEFAULT_ADMIN["role"]
     await db.commit()
-    print("✓ Created initial admin user (username: admin, password: admin123)")
+    await db.refresh(admin)
+    print("Default admin already exists; refreshed profile fields.")
     return admin
 
 
-async def create_regions(db: AsyncSession):
-    """Create initial regions."""
-    regions_data = [
-        {"name": "IbileLogic", "image": None},
-        {"name": "ArewaLogic", "image": None},
-        {"name": "NaijaLogic", "image": None},
-        {"name": "NigerDeltaLogic", "image": None},
-    ]
-    
-    regions = []
-    for data in regions_data:
-        region = Region(**data)
-        db.add(region)
-        regions.append(region)
-    
-    await db.commit()
-    print(f"✓ Created {len(regions)} regions")
-    return regions
+async def upsert_regions_and_zones(db: AsyncSession) -> Dict[str, Region]:
+    """Ensure regions and sub-zones exist. Returns region map by name."""
+    region_map: Dict[str, Region] = {}
+    created_regions = 0
+    created_zones = 0
 
+    for region_name, zones in REGION_ZONE_MAP.items():
+        region_result = await db.execute(select(Region).where(Region.name == region_name))
+        region = region_result.scalar_one_or_none()
 
-async def create_sub_zones(db: AsyncSession, regions):
-    """Create sub-zones for regions."""
-    zones_data = {
-        "IbileLogic": ["Lagos", "Ogun", "Oyo", "Osun", "Ekiti", "Ondo"],
-        "ArewaLogic": ["Kano", "Kaduna", "Katsina", "Sokoto", "Zamfara"],
-        "NaijaLogic": ["Abuja", "Nasarawa", "Niger", "Plateau"],
-        "NigerDeltaLogic": ["Rivers", "Delta", "Bayelsa", "Akwa Ibom"],
-    }
-    
-    zones_count = 0
-    for region in regions:
-        zone_names = zones_data.get(region.name, [])
-        for zone_name in zone_names:
-            zone = SubZone(
-                region_id=region.id,
-                name=zone_name,
-                image=None
+        if region is None:
+            region = Region(name=region_name, image=None)
+            db.add(region)
+            await db.flush()
+            created_regions += 1
+
+        region_map[region_name] = region
+
+        for zone_name in zones:
+            zone_result = await db.execute(
+                select(SubZone).where(
+                    SubZone.region_id == region.id,
+                    SubZone.name == zone_name,
+                )
             )
-            db.add(zone)
-            zones_count += 1
-    
+            zone = zone_result.scalar_one_or_none()
+            if zone is None:
+                db.add(SubZone(region_id=region.id, name=zone_name, image=None))
+                created_zones += 1
+
     await db.commit()
-    print(f"✓ Created {zones_count} sub-zones")
+    print(f"Regions ensured: {len(REGION_ZONE_MAP)} (new: {created_regions})")
+    print(f"Sub-zones ensured: {sum(len(v) for v in REGION_ZONE_MAP.values())} (new: {created_zones})")
+    return region_map
 
 
-async def create_sample_posts(db: AsyncSession, admin_id: str):
-    """Create sample posts."""
-    posts_data = [
-        {
-            "title": "Breaking: Major Infrastructure Project Announced",
-            "excerpt": "Government unveils ambitious new infrastructure plan for the region.",
-            "content": "<p>In a landmark announcement today, government officials revealed a comprehensive infrastructure development plan...</p>",
-            "author": "John Doe",
-            "date": "January 15, 2024",
-            "category": "IbileLogic",
-            "read_time": "5 min read",
-            "is_breaking": True,
-            "is_top_news": True,
-        },
-        {
-            "title": "Tech Innovation Hub Opens in Lagos",
-            "excerpt": "New technology center aims to boost local startup ecosystem.",
-            "content": "<p>A state-of-the-art technology innovation hub was inaugurated yesterday...</p>",
-            "author": "Jane Smith",
-            "date": "January 14, 2024",
-            "category": "IbileLogic",
-            "read_time": "4 min read",
-            "is_trending": True,
-        },
-        {
-            "title": "Agricultural Reform Shows Promise",
-            "excerpt": "New farming initiatives report early success in northern regions.",
-            "content": "<p>Recent agricultural reforms have shown promising results...</p>",
-            "author": "Ahmed Musa",
-            "date": "January 13, 2024",
-            "category": "ArewaLogic",
-            "read_time": "6 min read",
-            "is_editors_choice": True,
-        },
-        {
-            "title": "Education Sector Receives Major Funding",
-            "excerpt": "New budget allocation aims to improve schools across the nation.",
-            "content": "<p>The education sector has received a significant boost...</p>",
-            "author": "Sarah Johnson",
-            "date": "January 12, 2024",
-            "category": "NaijaLogic",
-            "read_time": "5 min read",
-            "is_trending": True,
-        },
-        {
-            "title": "Oil Industry Developments in Niger Delta",
-            "excerpt": "New policies aim to benefit local communities in oil-producing regions.",
-            "content": "<p>The Niger Delta region is seeing new developments...</p>",
-            "author": "Peter Okon",
-            "date": "January 11, 2024",
-            "category": "NigerDeltaLogic",
-            "read_time": "7 min read",
-            "is_top_news": True,
-        },
-    ]
-    
-    for data in posts_data:
-        post = Post(
-            **data,
-            admin_id=admin_id,
-            views=0,
-            image_url=None
+async def upsert_sample_posts(db: AsyncSession, admin_id: str) -> None:
+    """Insert sample posts by title if they do not already exist."""
+    created_posts = 0
+
+    for post_data in SAMPLE_POSTS:
+        result = await db.execute(select(Post).where(Post.title == post_data["title"]))
+        existing = result.scalar_one_or_none()
+        if existing is not None:
+            continue
+
+        db.add(
+            Post(
+                **post_data,
+                admin_id=admin_id,
+            )
         )
-        db.add(post)
-    
+        created_posts += 1
+
     await db.commit()
-    print(f"✓ Created {len(posts_data)} sample posts")
+    print(f"Sample posts ensured: {len(SAMPLE_POSTS)} (new: {created_posts})")
 
 
-async def seed_database():
-    """Main function to seed the database."""
+async def seed_database() -> None:
+    """Run all seed steps."""
     print("=" * 60)
-    print("Logic NewsAct - Database Seeding")
+    print("Logic NewsAct database seeding")
     print("=" * 60)
 
-    # Show database info
     if settings.is_supabase:
-        print("\n📡 Using Supabase database")
-        print(f"   URL: {settings.DATABASE_URL.split('@')[1].split('/')[0]}")
+        host = settings.DATABASE_URL.split("@")[-1].split("/")[0]
+        print(f"Database target: Supabase ({host})")
     else:
-        print("\n🐘 Using local PostgreSQL database")
+        print("Database target: Local PostgreSQL/MySQL-compatible URL")
 
-    # Initialize database tables
-    print("\nInitializing database tables...")
     try:
         await init_db()
-        print("✓ Tables created successfully")
-    except Exception as e:
-        print(f"\n✗ Error creating tables: {e}")
-        print("\nTroubleshooting:")
-        if settings.is_supabase:
-            print("  - Check your Supabase connection string in .env")
-            print("  - Ensure your IP is allowed in Supabase Dashboard > Database > Network")
-            print("  - For IPv4-only networks, enable the IPv4 addon in Supabase")
-        else:
-            print("  - Ensure PostgreSQL is running locally")
-            print("  - Check your DATABASE_URL in .env")
+        print("Database tables initialized.")
+    except Exception as exc:
+        print(f"Failed to initialize database tables: {exc}")
+        print("Check DATABASE_URL and database network/access settings.")
         sys.exit(1)
 
     async with AsyncSessionLocal() as db:
         try:
-            # Create admin
-            admin = await create_initial_admin(db)
-
-            # Create regions
-            regions = await create_regions(db)
-
-            # Create sub-zones
-            await create_sub_zones(db, regions)
-
-            # Create sample posts
-            await create_sample_posts(db, admin.id)
-
-            print("\n" + "=" * 60)
-            print("✓ Database seeding completed successfully!")
-            print("=" * 60)
-            print("\nInitial Admin Credentials:")
-            print("  Username: admin")
-            print("  Password: admin123")
-            print("\n⚠️  IMPORTANT: Change the default password in production!")
-            print("=" * 60)
-
-        except Exception as e:
-            print(f"\n✗ Error seeding database: {e}")
+            admin = await upsert_default_admin(db)
+            await upsert_regions_and_zones(db)
+            await upsert_sample_posts(db, admin.id)
+        except Exception as exc:
             await db.rollback()
+            print(f"Seeding failed: {exc}")
             raise
+
+    print("=" * 60)
+    print("Seeding completed.")
+    print("Default admin login: username=admin password=admin123")
+    print("Change the default password in production.")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

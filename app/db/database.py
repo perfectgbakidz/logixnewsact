@@ -16,10 +16,13 @@ def create_engine():
         "future": True,
         "pool_pre_ping": True,
     }
+    asyncpg_connect_args = {
+        "statement_cache_size": settings.DB_STATEMENT_CACHE_SIZE,
+    }
 
     # For Supabase, keep pool small and require SSL.
     if settings.is_supabase:
-        connect_args = {"ssl": "require"}
+        connect_args = {**asyncpg_connect_args, "ssl": "require"}
         return create_async_engine(
             settings.DATABASE_URL,
             connect_args=connect_args,
@@ -34,12 +37,14 @@ def create_engine():
     if settings.DEBUG:
         return create_async_engine(
             settings.DATABASE_URL,
+            connect_args=asyncpg_connect_args,
             poolclass=NullPool,
             **common_kwargs,
         )
 
     return create_async_engine(
         settings.DATABASE_URL,
+        connect_args=asyncpg_connect_args,
         pool_size=settings.DB_POOL_SIZE,
         max_overflow=settings.DB_MAX_OVERFLOW,
         pool_timeout=settings.DB_POOL_TIMEOUT,
