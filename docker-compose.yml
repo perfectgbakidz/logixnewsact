@@ -1,0 +1,57 @@
+# Logic NewsAct - Docker Compose Configuration
+# ============================================================================
+# This file provides two configurations:
+# 1. WITH local PostgreSQL (default)
+# 2. WITHOUT local DB (using Supabase) - comment out the 'db' service
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # Local PostgreSQL database (comment out if using Supabase)
+  db:
+    image: postgres:15-alpine
+    container_name: logic_newsact_db
+    environment:
+      POSTGRES_USER: logicuser
+      POSTGRES_PASSWORD: logicpass
+      POSTGRES_DB: logic_newsact
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logicuser -d logic_newsact"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: logic_newsact_api
+    environment:
+      # For local PostgreSQL:
+      DATABASE_URL: postgresql+asyncpg://logicuser:logicpass@db:5432/logic_newsact
+
+      # For Supabase (uncomment and update):
+      # DATABASE_URL: postgresql+asyncpg://postgres:your-password@db.your-project.supabase.co:5432/postgres
+
+      SECRET_KEY: your-super-secret-production-key-change-this
+      DEBUG: "false"
+      ALLOWED_ORIGINS: http://localhost:3000,https://logicnewsact.ng
+
+      # Supabase connection pool settings
+      DB_POOL_SIZE: 5
+      DB_MAX_OVERFLOW: 10
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    # For Supabase: remove 'depends_on' and 'condition' above
+    command: >
+      sh -c "python seed_data.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  postgres_data:
