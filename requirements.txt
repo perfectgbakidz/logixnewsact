@@ -37,8 +37,8 @@ python-dotenv==1.0.0
 # Testing
 pytest==7.4.4
 pytest-asyncio==0.23.3
-# Keep httpx compatible with supabase/gotrue runtime clients.
-httpx==0.27.2
+# Keep httpx compatible with supabase==2.3.4 dependency constraints.
+httpx>=0.24,<0.26
 
 # Development
 black==23.12.1
