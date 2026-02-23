@@ -18,11 +18,19 @@ def create_engine():
     }
     asyncpg_connect_args = {
         "statement_cache_size": settings.DB_STATEMENT_CACHE_SIZE,
+        "prepared_statement_cache_size": settings.DB_PREPARED_STATEMENT_CACHE_SIZE,
     }
 
-    # For Supabase, keep pool small and require SSL.
+    # For Supabase/PgBouncer, force SSL and prefer no app-side pooling.
     if settings.is_supabase:
         connect_args = {**asyncpg_connect_args, "ssl": "require"}
+        if settings.DB_NULL_POOL_FOR_SUPABASE:
+            return create_async_engine(
+                settings.DATABASE_URL,
+                connect_args=connect_args,
+                poolclass=NullPool,
+                **common_kwargs,
+            )
         return create_async_engine(
             settings.DATABASE_URL,
             connect_args=connect_args,

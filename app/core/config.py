@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800  # 30 minutes
     DB_STATEMENT_CACHE_SIZE: int = 0
+    DB_PREPARED_STATEMENT_CACHE_SIZE: int = 0
+    DB_NULL_POOL_FOR_SUPABASE: bool = True
 
     # JWT Authentication
     SECRET_KEY: str = "your-super-secret-key-change-this-in-production"
