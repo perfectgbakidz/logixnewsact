@@ -54,7 +54,7 @@ class StorageService:
         self,
         file_content: bytes,
         filename: str,
-        bucket: str = "public",
+        bucket: str = "publics",
         folder: str = "images",
         content_type: Optional[str] = None
     ) -> dict:
@@ -152,7 +152,7 @@ class StorageService:
             "provider": "local"
         }
 
-    async def delete_file(self, path: str, bucket: str = "public") -> bool:
+    async def delete_file(self, path: str, bucket: str = "publics") -> bool:
         """
         Delete a file from storage.
 
@@ -190,7 +190,7 @@ class StorageService:
                 print(f"Error deleting local file: {e}")
                 return False
 
-    def get_public_url(self, path: str, bucket: str = "public") -> str:
+    def get_public_url(self, path: str, bucket: str = "publics") -> str:
         """Get public URL for a file."""
         if self.use_supabase:
             return self.supabase.storage.from_(bucket).get_public_url(path)
@@ -207,7 +207,7 @@ async def upload_image(
     file_content: bytes,
     filename: str,
     folder: str = "images",
-    bucket: str = "public"
+    bucket: str = "publics"
 ) -> dict:
     """Upload an image file."""
     # Determine content type from filename
@@ -231,6 +231,6 @@ async def upload_image(
     )
 
 
-async def delete_image(url: str, bucket: str = "public") -> bool:
+async def delete_image(url: str, bucket: str = "publics") -> bool:
     """Delete an image by URL."""
     return await storage_service.delete_file(url, bucket)

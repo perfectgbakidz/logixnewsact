@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: Optional[str] = None
 
     # Supabase Storage Configuration
-    SUPABASE_STORAGE_BUCKET: str = "public"
+    SUPABASE_STORAGE_BUCKET: str = "publics"
     SUPABASE_STORAGE_PUBLIC: bool = True
 
     # Database Pool Settings (important for Supabase connection limits)
