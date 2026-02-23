@@ -59,11 +59,15 @@ def create_application() -> FastAPI:
     # Add rate limiter
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    origins = [
+    "https://logicnewsact.vercel.app",  # your frontend
+]
     
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.allowed_origins_list,
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
