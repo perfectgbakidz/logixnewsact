@@ -4,6 +4,7 @@ Application configuration using Pydantic Settings.
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import List, Optional
+from urllib.parse import urlparse
 
 
 class Settings(BaseSettings):
@@ -43,7 +44,7 @@ class Settings(BaseSettings):
 
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
-    TRUSTED_HOSTS: str = "localhost,127.0.0.1"
+    TRUSTED_HOSTS: str = "localhost,127.0.0.1,*.onrender.com"
 
     # Security
     RATE_LIMIT_REQUESTS: int = 100
@@ -56,8 +57,22 @@ class Settings(BaseSettings):
 
     @property
     def trusted_hosts_list(self) -> List[str]:
-        """Parse TRUSTED_HOSTS string into list."""
-        return [host.strip() for host in self.TRUSTED_HOSTS.split(",")]
+        """Parse TRUSTED_HOSTS string into hostnames accepted by TrustedHostMiddleware."""
+        hosts: List[str] = []
+        for raw in self.TRUSTED_HOSTS.split(","):
+            value = raw.strip()
+            if not value:
+                continue
+            if "://" in value:
+                parsed = urlparse(value)
+                value = parsed.hostname or ""
+            if "/" in value:
+                value = value.split("/", 1)[0]
+            if ":" in value:
+                value = value.split(":", 1)[0]
+            if value:
+                hosts.append(value)
+        return hosts
 
     @property
     def is_supabase(self) -> bool:
