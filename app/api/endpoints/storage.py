@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 
 from app.api.deps import get_current_admin
 from app.services.storage import upload_image, delete_image
+from app.core.config import settings
 
 
 router = APIRouter()
@@ -58,7 +59,7 @@ def _validate_image_upload(
 async def upload_file(
     file: UploadFile = File(..., description="File to upload"),
     folder: str = Form(default="posts", description="Folder path within bucket"),
-    bucket: str = Form(default="public", description="Storage bucket name"),
+    bucket: str = Form(default=settings.SUPABASE_STORAGE_BUCKET, description="Storage bucket name"),
     current_admin = Depends(get_current_admin)
 ):
     """
@@ -88,7 +89,7 @@ async def upload_file(
     if not result.get("success"):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload file"
+            detail=result.get("error", "Failed to upload file")
         )
 
     return {
@@ -103,7 +104,7 @@ async def upload_file(
 @router.delete("/upload/delete")
 async def delete_file(
     url: str,
-    bucket: str = "public",
+    bucket: str = settings.SUPABASE_STORAGE_BUCKET,
     current_admin = Depends(get_current_admin)
 ):
     """
@@ -152,13 +153,13 @@ async def upload_avatar(
         file_content=content,
         filename=file.filename or "avatar.jpg",
         folder="avatars",
-        bucket="public"
+        bucket=settings.SUPABASE_STORAGE_BUCKET
     )
 
     if not result.get("success"):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload avatar"
+            detail=result.get("error", "Failed to upload avatar")
         )
 
     return {
@@ -190,13 +191,13 @@ async def upload_post_image(
         file_content=content,
         filename=file.filename or "post.jpg",
         folder="posts",
-        bucket="public"
+        bucket=settings.SUPABASE_STORAGE_BUCKET
     )
 
     if not result.get("success"):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload image"
+            detail=result.get("error", "Failed to upload image")
         )
 
     return {

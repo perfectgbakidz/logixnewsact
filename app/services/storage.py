@@ -123,9 +123,15 @@ class StorageService:
             }
 
         except Exception as e:
-            # Fallback to local storage
-            print(f"Supabase upload failed, falling back to local: {e}")
-            return await self._upload_local(file_content, storage_path, bucket)
+            # Do not silently fall back when Supabase is configured.
+            # This prevents storing local paths in DB when cloud upload fails.
+            return {
+                "success": False,
+                "error": f"Supabase upload failed: {e}",
+                "path": storage_path,
+                "bucket": bucket,
+                "provider": "supabase"
+            }
 
     async def _upload_local(
         self,
