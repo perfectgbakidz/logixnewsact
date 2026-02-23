@@ -2,6 +2,8 @@
 Database configuration and session management.
 Supports both local PostgreSQL and Supabase.
 """
+from uuid import uuid4
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
@@ -19,6 +21,7 @@ def create_engine():
     asyncpg_connect_args = {
         "statement_cache_size": settings.DB_STATEMENT_CACHE_SIZE,
         "prepared_statement_cache_size": settings.DB_PREPARED_STATEMENT_CACHE_SIZE,
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
     }
 
     # For Supabase/PgBouncer, force SSL and prefer no app-side pooling.
