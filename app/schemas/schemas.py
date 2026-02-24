@@ -130,14 +130,21 @@ class PostBase(BaseSchema):
     excerpt: str = Field(..., min_length=1)
     content: str = Field(..., min_length=1)
     author: str = Field(..., min_length=1, max_length=100)
-    date: str = Field(..., max_length=50)
+    date: str = Field(
+        default_factory=lambda: datetime.now().strftime("%B %d, %Y"),
+        max_length=50
+    )
     category: str = Field(..., min_length=1, max_length=100)
-    image_url: Optional[str] = None
-    read_time: str = Field(default="5 min read", max_length=20)
-    is_breaking: bool = False
-    is_editors_choice: bool = False
-    is_top_news: bool = False
-    is_trending: bool = False
+    image_url: Optional[str] = Field(default=None, validation_alias="imageUrl")
+    read_time: str = Field(
+        default="5 min read",
+        max_length=20,
+        validation_alias="readTime"
+    )
+    is_breaking: bool = Field(default=False, validation_alias="isBreaking")
+    is_editors_choice: bool = Field(default=False, validation_alias="isEditorsChoice")
+    is_top_news: bool = Field(default=False, validation_alias="isTopNews")
+    is_trending: bool = Field(default=False, validation_alias="isTrending")
 
 
 class PostCreate(PostBase):
@@ -158,12 +165,16 @@ class PostUpdate(BaseSchema):
     author: Optional[str] = Field(None, max_length=100)
     date: Optional[str] = Field(None, max_length=50)
     category: Optional[str] = Field(None, max_length=100)
-    image_url: Optional[str] = None
-    read_time: Optional[str] = Field(None, max_length=20)
-    is_breaking: Optional[bool] = None
-    is_editors_choice: Optional[bool] = None
-    is_top_news: Optional[bool] = None
-    is_trending: Optional[bool] = None
+    image_url: Optional[str] = Field(default=None, validation_alias="imageUrl")
+    read_time: Optional[str] = Field(
+        default=None,
+        max_length=20,
+        validation_alias="readTime"
+    )
+    is_breaking: Optional[bool] = Field(default=None, validation_alias="isBreaking")
+    is_editors_choice: Optional[bool] = Field(default=None, validation_alias="isEditorsChoice")
+    is_top_news: Optional[bool] = Field(default=None, validation_alias="isTopNews")
+    is_trending: Optional[bool] = Field(default=None, validation_alias="isTrending")
     
     @field_validator("content")
     @classmethod
