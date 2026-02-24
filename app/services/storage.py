@@ -25,6 +25,7 @@ class StorageService:
     def __init__(self):
         self.supabase: Optional[Client] = None
         self.use_supabase = False
+        self.supabase_init_error: Optional[str] = None
         self.local_storage_path = Path("uploads")
 
         # Initialize Supabase client if credentials are available
@@ -37,6 +38,7 @@ class StorageService:
                 self.use_supabase = True
             except Exception as e:
                 print(f"Warning: Could not initialize Supabase client: {e}")
+                self.supabase_init_error = str(e)
                 self.use_supabase = False
 
         # Ensure local storage directory exists
@@ -77,10 +79,23 @@ class StorageService:
             return await self._upload_to_supabase(
                 file_content, storage_path, bucket, content_type
             )
-        else:
-            return await self._upload_local(
-                file_content, storage_path, bucket
-            )
+
+        # If Supabase is configured but initialization failed, fail loudly.
+        if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY:
+            return {
+                "success": False,
+                "error": (
+                    "Supabase storage is configured but unavailable. "
+                    f"Initialization error: {self.supabase_init_error or 'unknown error'}"
+                ),
+                "path": storage_path,
+                "bucket": bucket,
+                "provider": "supabase"
+            }
+
+        return await self._upload_local(
+            file_content, storage_path, bucket
+        )
 
     async def _upload_to_supabase(
         self,
